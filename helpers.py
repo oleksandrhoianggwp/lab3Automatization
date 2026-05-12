@@ -3,6 +3,7 @@ import re
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -59,15 +60,17 @@ def click_side_menu(driver, name):
 
 
 def read_records_found(driver, timeout=DEFAULT_TIMEOUT):
-    locator = (
-        By.XPATH,
-        "//span[contains(@class,'oxd-text') and contains(text(),'Records Found')]",
-    )
-    el = wait_visible(driver, locator, timeout)
-    match = re.search(r"\((\d+)\)", el.text)
-    if not match:
-        raise RuntimeError(f"Cannot parse records-found text: {el.text!r}")
-    return int(match.group(0).strip("()"))
+    def parse_count(active_driver):
+        text = active_driver.find_element(By.TAG_NAME, "body").text
+        match = re.search(r"\((\d+)\)\s*Records? Found", text)
+        if match:
+            return int(match.group(1))
+        if "No Records Found" in text:
+            return 0
+        return None
+
+    count = WebDriverWait(driver, timeout).until(parse_count)
+    return count
 
 
 def select_oxd_dropdown(driver, label_text, option_text):
@@ -101,6 +104,8 @@ def fill_input_by_label(driver, label_text, value):
             "/ancestor::div[contains(@class,'oxd-input-group')]//input",
         ),
     )
+    inp.send_keys(Keys.CONTROL, "a")
+    inp.send_keys(Keys.DELETE)
     inp.clear()
     inp.send_keys(value)
     return inp
